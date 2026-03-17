@@ -5,18 +5,27 @@ import pyodbc
 def get_conn():
     return pyodbc.connect(
         "DRIVER={ODBC Driver 17 for SQL Server};"
-        "SERVER=localhost;"
+        "SERVER=192.168.1.62,1433;"
         "DATABASE=amazon_dw;"
-        "Trusted_Connection=yes;"
+        "UID=sa;"
+        "PWD=dfaa4200;"
     )
 
-def insert_df(cursor, df, table_name):
-    """Insère un DataFrame ligne par ligne via pyodbc."""
-    cols = ', '.join(df.columns)
+def insert_df(cursor, df, table_name, pk_col):
+    """
+    MERGE : insère seulement les nouvelles lignes.
+    Ne touche pas aux données existantes.
+    """
+    cols         = ', '.join(df.columns)
     placeholders = ', '.join(['?' for _ in df.columns])
-    sql = f"INSERT INTO {table_name} ({cols}) VALUES ({placeholders})"
-    data = [tuple(row) for row in df.itertuples(index=False, name=None)]
-    cursor.executemany(sql, data)
+
+    sql = f"""
+        IF NOT EXISTS (SELECT 1 FROM {table_name} WHERE {pk_col} = ?)
+        INSERT INTO {table_name} ({cols}) VALUES ({placeholders})
+    """
+    for row in df.itertuples(index=False, name=None):
+        pk_value = row[list(df.columns).index(pk_col)]
+        cursor.execute(sql, (pk_value,) + tuple(row))
 
 def load(df):
     conn   = get_conn()
@@ -30,34 +39,29 @@ def load(df):
         dim_date.columns = ['date_id','year','month','quarter',
                             'day_of_week','month_name']
         dim_date['date_id'] = dim_date['date_id'].astype(str)
-        insert_df(cursor, dim_date, 'Dim_Date')
+        insert_df(cursor, dim_date, 'Dim_Date', 'date_id')
         conn.commit()
         print(f"  ✅ Dim_Date      : {len(dim_date)} lignes")
 
         # --- Dim_Product ---
-        # --- Dim_Product ---
         dim_product = df[['ProductID','ProductName',
                   'Category','Brand']].copy()
         dim_product.columns = ['product_id','product_name','category','brand']
-
-        # ⚠️ drop_duplicates AVANT tout le reste
         dim_product = dim_product.drop_duplicates(subset=['product_id'], keep='first')
 
-         # Vérification
         print(f"  Nb ProductID uniques : {dim_product['product_id'].nunique()}")
         print(f"  Nb lignes total      : {len(dim_product)}")
         print(f"  Doublons restants    : {dim_product.duplicated(subset=['product_id']).sum()}")
 
-        insert_df(cursor, dim_product, 'Dim_Product')
+        insert_df(cursor, dim_product, 'Dim_Product', 'product_id')
         conn.commit()
         print(f"  ✅ Dim_Product   : {len(dim_product)} lignes")
-    
 
         # --- Dim_Customer ---
         dim_customer = df[['CustomerID','CustomerName','PaymentMethod']].copy()
         dim_customer.columns = ['customer_id','customer_name','payment_method']
         dim_customer = dim_customer.drop_duplicates(subset=['customer_id'], keep='first')
-        insert_df(cursor, dim_customer, 'Dim_Customer')
+        insert_df(cursor, dim_customer, 'Dim_Customer', 'customer_id')
         conn.commit()
         print(f"  ✅ Dim_Customer  : {len(dim_customer)} lignes")
 
@@ -65,8 +69,7 @@ def load(df):
         dim_location = df[['City','State','Country']].copy()
         dim_location.columns = ['city','state','country']
         dim_location = dim_location.drop_duplicates(subset=['city','state','country'], keep='first')
-
-        insert_df(cursor, dim_location, 'Dim_Location')
+        insert_df(cursor, dim_location, 'Dim_Location', 'city')
         conn.commit()
         print(f"  ✅ Dim_Location  : {len(dim_location)} lignes")
 
@@ -74,7 +77,7 @@ def load(df):
         dim_seller = df[['SellerID']].copy()
         dim_seller.columns = ['seller_id']
         dim_seller = dim_seller.drop_duplicates(subset=['seller_id'], keep='first')
-        insert_df(cursor, dim_seller, 'Dim_Seller')
+        insert_df(cursor, dim_seller, 'Dim_Seller', 'seller_id')
         conn.commit()
         print(f"  ✅ Dim_Seller    : {len(dim_seller)} lignes")
 
@@ -112,9 +115,7 @@ def load(df):
 
         fact['date_id'] = fact['date_id'].astype(str)
 
-        
-
-        insert_df(cursor, fact, 'Fact_Commandes')
+        insert_df(cursor, fact, 'Fact_Commandes', 'order_id')
         conn.commit()
         print(f"  ✅ Fact_Commandes: {len(fact)} lignes")
 
