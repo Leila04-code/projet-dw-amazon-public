@@ -1,6 +1,8 @@
 # scripts/load.py
 import pandas as pd
 import pyodbc
+from extract import write_watermark   # ✅ watermark déplacé ici
+
 
 def get_conn():
     return pyodbc.connect(
@@ -10,6 +12,7 @@ def get_conn():
         "UID=sa;"
         "PWD=dfaa4200;"
     )
+
 
 def insert_df(cursor, df, table_name, pk_col):
     """
@@ -26,6 +29,7 @@ def insert_df(cursor, df, table_name, pk_col):
     for row in df.itertuples(index=False, name=None):
         pk_value = row[list(df.columns).index(pk_col)]
         cursor.execute(sql, (pk_value,) + tuple(row))
+
 
 def load(df):
     conn   = get_conn()
@@ -44,15 +48,9 @@ def load(df):
         print(f"  ✅ Dim_Date      : {len(dim_date)} lignes")
 
         # --- Dim_Product ---
-        dim_product = df[['ProductID','ProductName',
-                  'Category','Brand']].copy()
+        dim_product = df[['ProductID','ProductName','Category','Brand']].copy()
         dim_product.columns = ['product_id','product_name','category','brand']
         dim_product = dim_product.drop_duplicates(subset=['product_id'], keep='first')
-
-        print(f"  Nb ProductID uniques : {dim_product['product_id'].nunique()}")
-        print(f"  Nb lignes total      : {len(dim_product)}")
-        print(f"  Doublons restants    : {dim_product.duplicated(subset=['product_id']).sum()}")
-
         insert_df(cursor, dim_product, 'Dim_Product', 'product_id')
         conn.commit()
         print(f"  ✅ Dim_Product   : {len(dim_product)} lignes")
@@ -89,6 +87,14 @@ def load(df):
             columns=['location_id','city','state','country']
         )
 
+        # --- Normaliser casse avant merge ---
+        df['City']    = df['City'].str.strip().str.lower()
+        df['State']   = df['State'].str.strip().str.lower()
+        df['Country'] = df['Country'].str.strip().str.lower()
+        dim_loc_db['city']    = dim_loc_db['city'].str.strip().str.lower()
+        dim_loc_db['state']   = dim_loc_db['state'].str.strip().str.lower()
+        dim_loc_db['country'] = dim_loc_db['country'].str.strip().str.lower()
+
         # --- Fact_Commandes ---
         df_merged = df.merge(
             dim_loc_db,
@@ -119,11 +125,20 @@ def load(df):
         conn.commit()
         print(f"  ✅ Fact_Commandes: {len(fact)} lignes")
 
+        # ✅ Watermark mis à jour SEULEMENT après succès complet du load
+        # Si load échoue → watermark pas avancé → relance repart du bon endroit
+        new_last_id = int(
+            fact['order_id'].str.replace('ORD', '', regex=False).str.strip().astype(int).max()
+        )
+        write_watermark(new_last_id)
+        print(f"  ✅ Watermark mis à jour → ORD{new_last_id:07d}")
+
         print("✅ Chargement SQL Server terminé !")
 
     except Exception as e:
         conn.rollback()
         print(f"❌ Erreur : {e}")
+        # ✅ Watermark PAS écrit → relance sécurisée
         raise
 
     finally:
@@ -132,8 +147,8 @@ def load(df):
 
 
 if __name__ == "__main__":
-    from extract   import extract
-    from transform import transform
+    from extract import extract
     df_raw   = extract()
+    from transform import transform
     df_clean = transform(df_raw)
     load(df_clean)

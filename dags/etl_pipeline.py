@@ -8,7 +8,7 @@ sys.path.insert(0, '/opt/airflow/scripts')
 from extract   import extract
 from transform import transform
 from load      import load
-
+from simulate_daily import simulate_daily_sales  # ← importer
 default_args = {
     'owner'       : 'binome-a',
     'retries'     : 2,
@@ -51,7 +51,7 @@ def run_load(**kwargs):
         print("ℹ️  Aucune donnée à charger.")
         return
     df = pd.read_json(clean)
-    df['OrderDate'] = pd.to_datetime(df['OrderDate'])
+    df['OrderDate'] = pd.to_datetime(df['OrderDate'], unit='ms')
     load(df)
 
 with DAG(
