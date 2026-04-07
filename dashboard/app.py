@@ -397,3 +397,81 @@ st.dataframe(
 
 st.markdown("---")
 st.caption("Amazon Sales Dashboard • Projet BI 2026")
+# ================= IA : PREDICTION CA =================
+st.markdown("##  Prévision du chiffre d'affaires")
+
+try:
+    hist = pd.read_csv("ml/output/historical_revenue_with_predictions.csv")
+    future = pd.read_csv("ml/output/future_revenue_forecast.csv")
+
+    hist["date"] = hist["year"].astype(str) + "-" + hist["month"].astype(str).str.zfill(2)
+    future["date"] = future["year"].astype(str) + "-" + future["month"].astype(str).str.zfill(2)
+
+    fig_pred = px.line(
+        hist,
+        x="date",
+        y="ca_mensuel",
+        title="Historique + prédiction",
+        labels={"ca_mensuel": "CA réel"},
+        color_discrete_sequence=["#1B6B7B"]
+    )
+
+    fig_pred.add_scatter(
+        x=hist["date"],
+        y=hist["prediction_train"],
+        mode="lines",
+        name="Prédiction (train)",
+        line=dict(dash="dot", color="#8B2346")
+    )
+
+    fig_pred.add_scatter(
+        x=future["date"],
+        y=future["ca_mensuel_prevu"],
+        mode="lines+markers",
+        name="Prévision future",
+        line=dict(color="#C4748A")
+    )
+
+    fig_pred.update_layout(
+        paper_bgcolor="#FDF0F3",
+        plot_bgcolor="white",
+        xaxis_title="Temps",
+        yaxis_title="CA net ($)"
+    )
+
+    st.plotly_chart(fig_pred, use_container_width=True)
+
+except:
+    st.warning("⚠️ Fichiers de prédiction non trouvés")
+
+# ================= IA : CLUSTERING CLIENTS =================
+st.markdown("##  Segmentation des clients (K-means)")
+
+try:
+    clusters = pd.read_csv("ml/output/customer_clusters.csv")
+    summary = pd.read_csv("ml/output/cluster_summary.csv")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig_cluster = px.scatter(
+            clusters,
+            x="frequence_commandes",
+            y="ca_total",
+            color="segment_label",
+            title="Segmentation clients",
+            hover_data=["customer_name"],
+            color_discrete_sequence=["#8B2346","#1B6B7B","#2D8A6E"]
+        )
+        fig_cluster.update_layout(
+            paper_bgcolor="#FDF0F3",
+            plot_bgcolor="white"
+        )
+        st.plotly_chart(fig_cluster, use_container_width=True)
+
+    with col2:
+        st.markdown("### 📊 Résumé des segments")
+        st.dataframe(summary, use_container_width=True)
+
+except:
+    st.warning("⚠️ Fichiers de clustering non trouvés")
