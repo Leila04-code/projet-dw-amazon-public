@@ -3,6 +3,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import pyodbc
+import subprocess
 
 # ================= CONFIG =================
 st.set_page_config(
@@ -71,6 +72,28 @@ fact, prod, loc, date, cust = load_data()
 
 if fact is None:
     st.stop()
+
+#=========refresh=========
+colA, colB, colC = st.columns([5,1,1])
+
+with colB:
+    if st.button("🔄 Refresh"):
+        st.cache_data.clear()
+        st.rerun()
+
+with colC:
+    if st.button(" Recalcul IA"):
+        with st.spinner("Recalcul des modèles en cours..."):
+            try:
+                subprocess.run(["python", "ml/regression_forecast.py"], check=True)
+                subprocess.run(["python", "ml/clustering_clients.py"], check=True)
+
+                st.success("✅ Modèles IA recalculés avec succès")
+                st.cache_data.clear()
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"❌ Erreur lors du recalcul IA : {e}")
 
 # ================= PREPARATION DES DONNEES =================
 df = (
