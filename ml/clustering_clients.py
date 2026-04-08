@@ -7,10 +7,10 @@ from sklearn.preprocessing import StandardScaler
 # ================= CONFIG CONNEXION =================
 SQL_CONFIG = {
     "driver": "ODBC Driver 17 for SQL Server",
-    "server": "amazon--server.database.windows.net",   # à changer demain
+    "server": "monamazon--server.database.windows.net;",   
     "database": "amazone_dw",                          # à vérifier demain
-    "uid": "CloudSA456cceb9",                          # à changer demain
-    "pwd": "Leilaamazonserver04"                       # à changer demain
+    "uid": "ServerSA456cceb9;",                          # à changer demain
+    "pwd": "almy1234@;"                       # à changer demain
 }
 
 

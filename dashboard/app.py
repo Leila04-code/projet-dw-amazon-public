@@ -46,10 +46,10 @@ def load_data():
     try:
         conn = pyodbc.connect(
             "DRIVER={ODBC Driver 17 for SQL Server};"
-            "SERVER=amazon--server.database.windows.net;"
+            "SERVER=monamazon--server.database.windows.net;"
             "DATABASE=amazone_dw;"
-            "UID=CloudSA456cceb9;"
-            "PWD=Leilaamazonserver04;"
+            "UID=ServerSA456cceb9;"
+            "PWD=almy1234@;"
             "Encrypt=yes;"
             "TrustServerCertificate=no;"
             "Connection Timeout=30;"
