@@ -1,5 +1,6 @@
 streamlit
 plotly
+pyodbc
 asttokens==3.0.1
 colorama==0.4.6
 comm==0.2.3
